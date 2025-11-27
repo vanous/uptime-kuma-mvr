@@ -546,7 +546,7 @@ wheels = [
 
 [[package]]
 name = "mvrtokuma"
-version = "0.6.0"
+version = "0.5.0"
 source = { virtual = "." }
 dependencies = [
     { name = "ifaddr" },
@@ -565,7 +565,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "ifaddr", specifier = ">=0.2.0" },
-    { name = "pymvr", specifier = ">=1.0.4" },
+    { name = "pymvr", specifier = ">=1.0.5" },
     { name = "textual", specifier = ">=6.2.1" },
     { name = "textual-fspicker", specifier = ">=0.6.0" },
     { name = "uptime-kuma-api", specifier = ">=1.2.1" },
@@ -725,10 +725,10 @@ wheels = [
 
 [[package]]
 name = "pymvr"
-version = "1.0.4"
+version = "1.0.5"
 source = { registry = "https://pypi.org/simple" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c7/27/aab12298c910492a5dd04db66e733f6341acdcc252b991b3532ed92f1b80/pymvr-1.0.4-py3-none-any.whl", hash = "sha256:4126945e15b05b2443495a0c2fa39803859713288291490871a9a45c31d2f105", size = 15009, upload-time = "2025-09-14T08:35:46.964Z" },
+    { url = "https://files.pythonhosted.org/packages/5b/22/8c32dd91361a2e19f7311d71a0f0079a0d8c6037ca3d4e6f9c8923e61ffd/pymvr-1.0.5-py3-none-any.whl", hash = "sha256:d54c431bd8c58cdd674891018ea7c51b08483c54a84bcbb8059d56327acc2ce7", size = 15633, upload-time = "2025-11-27T22:37:30.305Z" },
 ]
 
 [[package]]

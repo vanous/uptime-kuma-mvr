@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "ifaddr>=0.2.0",
-    "pymvr>=1.0.4",
+    "pymvr>=1.0.5",
     "textual>=6.2.1",
     "textual-fspicker>=0.6.0",
     "uptime-kuma-api>=1.2.1",

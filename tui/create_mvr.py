@@ -37,7 +37,7 @@ def create_mvr(devices):
         if net_fixture.ip_address is None:
             continue
         fixture = pymvr.Fixture(name=net_fixture.short_name)
-        fixture.addresses.network.append(pymvr.Network(ipv4=net_fixture.ip_address))
+        fixture.addresses.networks.append(pymvr.Network(ipv4=net_fixture.ip_address))
         if net_fixture.address is not None:
             address = 1
             universe = 1
@@ -46,7 +46,7 @@ def create_mvr(devices):
                 universe = int(net_fixture.universe or 1)
             except:
                 ...
-            fixture.addresses.address.append(
+            fixture.addresses.addresses.append(
                 pymvr.Address(
                     dmx_break=0,
                     universe=universe,

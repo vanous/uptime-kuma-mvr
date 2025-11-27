@@ -46,13 +46,13 @@ def get_fixtures(file_path):
 
 
 def get_ipv4_network(fixture):
-    for network in fixture.addresses.network:
+    for network in fixture.addresses.networks:
         if network.ipv4:
             return network
 
 
 def get_address(fixture):
-    for address in fixture.addresses.address:
+    for address in fixture.addresses.addresses:
         if address:
             return address
 
@@ -65,7 +65,7 @@ def copy_network(in_ipv4_network, out_fixture):
     out_ipv4_network = get_ipv4_network(out_fixture)
     if out_ipv4_network is None:
         ipv4 = deepcopy(in_ipv4_network)
-        out_fixture.addresses.network.append(ipv4)
+        out_fixture.addresses.networks.append(ipv4)
     else:
         out_ipv4_network = deepcopy(in_ipv4_network)
 

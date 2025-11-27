@@ -507,7 +507,7 @@ class MVRtoKuma(App):
 
                 for mvr_fixture in layer.fixtures or []:
                     url = None
-                    for network in mvr_fixture.addresses.network:
+                    for network in mvr_fixture.addresses.networks:
                         if network.ipv4 is not None:
                             url = network.ipv4
                             break
