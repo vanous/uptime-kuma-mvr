@@ -113,6 +113,13 @@ class ConfigScreen(ModalScreen[dict]):
                     placeholder="Enter timeout (s)", id="timeout", type="integer"
                 )
             with Horizontal():
+                yield Label("Discovery Timeout:")
+                yield Input(
+                    placeholder="Enter timeout (s)",
+                    id="artnet_timeout",
+                    type="integer",
+                )
+            with Horizontal():
                 yield Label("Show IDs in listing:")
                 with Horizontal(id="details_checkbox_container"):
                     yield Checkbox(id="details_toggle")
@@ -133,6 +140,9 @@ class ConfigScreen(ModalScreen[dict]):
             self.query_one("#username", Input).value = self.data.get("username", "")
             self.query_one("#password", Input).value = self.data.get("password", "")
             self.query_one("#timeout", Input).value = self.data.get("timeout", "1")
+            self.query_one("#artnet_timeout", Input).value = self.data.get(
+                "artnet_timeout", "2"
+            )
             self.query_one("#details_toggle", Checkbox).value = self.data.get(
                 "details_toggle", False
             )
@@ -159,6 +169,7 @@ class ConfigScreen(ModalScreen[dict]):
                     "username": self.query_one("#username").value,
                     "password": self.query_one("#password").value,
                     "timeout": self.query_one("#timeout").value,
+                    "artnet_timeout": self.query_one("#artnet_timeout").value,
                     "details_toggle": self.query_one("#details_toggle").value,
                     "singleline_ui_toggle": self.query_one(
                         "#singleline_ui_toggle"
@@ -546,7 +557,11 @@ class ArtNetScreen(ModalScreen):
             results_widget.update("Searching...")
             discovery = ArtNetDiscovery(bind_ip=self.network)
             discovery.start()
-            result = discovery.discover_devices()
+            try:
+                timeout = float(self.app.artnet_timeout)
+            except (TypeError, ValueError):
+                timeout = 1.5
+            result = discovery.discover_devices(timeout=timeout)
             discovery.stop()  # not really needed, as the thread will close...
             self.post_message(DevicesDiscovered(devices=result))
         except Exception as e:

@@ -121,6 +121,7 @@ class MVRtoKuma(App):
     username: str = ""
     password: str = ""
     timeout: str = "1"
+    artnet_timeout: str = "2"
     details_toggle: bool = False
     singleline_ui_toggle: bool = True
 
@@ -198,6 +199,7 @@ class MVRtoKuma(App):
                     self.username = data.get("username", "")
                     self.password = data.get("password", "")
                     self.timeout = data.get("timeout", "1")
+                    self.artnet_timeout = data.get("artnet_timeout", "2")
                     self.layers_toggle = data.get("layers", False)
                     self.classes_toggle = data.get("classes", False)
                     self.positions_toggle = data.get("positions", False)
@@ -272,6 +274,7 @@ class MVRtoKuma(App):
                 "username": self.username,
                 "password": self.password,
                 "timeout": self.timeout,
+                "artnet_timeout": self.artnet_timeout,
                 "details_toggle": self.details_toggle,
                 "singleline_ui_toggle": self.singleline_ui_toggle,
             }
@@ -283,6 +286,7 @@ class MVRtoKuma(App):
                     self.username = data.get("username", "")
                     self.password = data.get("password", "")
                     self.timeout = data.get("timeout", "1")
+                    self.artnet_timeout = data.get("artnet_timeout", "2")
                     self.details_toggle = data.get("details_toggle", False)
                     self.singleline_ui_toggle = data.get("singleline_ui_toggle", True)
                     self.action_save_config()
@@ -656,6 +660,7 @@ class MVRtoKuma(App):
             "username": self.username,
             "password": self.password,
             "timeout": self.timeout,
+            "artnet_timeout": self.artnet_timeout,
             "layers": self.layers_toggle,
             "classes": self.classes_toggle,
             "positions": self.positions_toggle,
