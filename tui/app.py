@@ -506,6 +506,11 @@ class MVRtoKuma(App):
             self.post_message(Errors(error="Not logged in"))
             return
         try:
+            heartbeat_interval = 60
+            retry_interval = 60
+            resend_interval = 0
+            max_retries = 0
+
             for layer in self.mvr_fixtures:
                 print("debug layer", layer)
 
@@ -537,6 +542,10 @@ class MVRtoKuma(App):
                             name=mvr_fixture.name,
                             url=f"http://{url}",
                             description=mvr_fixture.uuid,
+                            interval=heartbeat_interval,
+                            retryInterval=retry_interval,
+                            resendInterval=resend_interval,
+                            maxretries=max_retries,
                         )
 
                         monitor_id = result.get("monitorID", None)
