@@ -538,8 +538,9 @@ class MVRtoKuma(App):
                     if add_monitor:
                         print("Add new monitor")
                         result = api.add_monitor(
-                            type=MonitorType.HTTP,
+                            type=MonitorType.PING,
                             name=mvr_fixture.name,
+                            hostname=url,
                             url=f"http://{url}",
                             description=mvr_fixture.uuid,
                             interval=heartbeat_interval,
