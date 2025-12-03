@@ -168,8 +168,6 @@ MVRtoKuma .big_button {
     grid-columns: 1fr auto;
     height: 1;
     align: left middle;
-    padding-left: 1;
-    padding-right: 1;
 }
 
 #kuma_tag_filter {
@@ -187,7 +185,7 @@ MVRtoKuma .big_button {
 #add_kuma_tag {
     height: 1;
     min-width: 10;
-    padding: 0 2;
+    padding: 0 0;
     border: none;
     background: yellow;
     color: black;
@@ -197,15 +195,19 @@ MVRtoKuma .big_button {
 }
 
 #kuma_filter_row {
+    grid-size: 2 1;
+    grid-columns: 1fr auto;
     height: 1;
-    width: 100%;
+    align: left middle;
+    padding-left: 0;
+    padding-right: 0;
 }
 
 #kuma_fixture_filter {
     height: 1;
     margin: 0;
     padding: 0 1;
-    width: 80%;
+    width: 100%;
     background: #444;
     color: white;
     border: none;
@@ -215,14 +217,14 @@ MVRtoKuma .big_button {
 
 #apply_kuma_tags {
     height: 1;
-    width: 20%;
-    padding: 0;
+    min-width: 10;
+    padding: 0 0;
+    border: none;
     background: yellow;
     color: black;
-    border: none;
     text-style: bold;
     content-align: center middle;
-    align: center middle;
+    outline: none;
 }
 
 #kuma_fixture_list {

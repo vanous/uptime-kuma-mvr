@@ -252,7 +252,7 @@ class KumaFixtureListDisplay(Vertical):
         self.selected_tags: set[str] = set()
 
     def compose(self) -> ComposeResult:
-        with Horizontal(id="kuma_filter_row"):
+        with Grid(id="kuma_header"):
             yield Input(
                 placeholder="Filter by name or IP",
                 id="kuma_fixture_filter",
@@ -260,7 +260,7 @@ class KumaFixtureListDisplay(Vertical):
             yield Button(
                 "Tags",
                 id="apply_kuma_tags",
-                classes="filter_button",
+                classes="small_button tag_header_button",
                 disabled=True,
             )
         self.list_container = VerticalScroll(id="kuma_fixture_list")
@@ -435,23 +435,23 @@ class MVRtoKuma(App):
 
     def compose(self) -> ComposeResult:
         """Create child widgets for the app."""
-        yield Header()
-        with Vertical(id="all_around"):
+        with Vertical(id="all_around") as v:
+            v.border_title = "MVR to Kuma"
             with Vertical(id="json_output_container"):
                 yield Static(
                     "Ready... make sure to Configure Uptime Kuma address and credentials",
                     id="json_output",
                 )
                 with Horizontal(id="content_split"):
-                    with Vertical(id="left"):
-                        with Grid(id="mvr_header"):
-                            yield Static("[b]MVR data:[/b]")
+                    with Vertical(id="left") as v:
+                        v.border_title = "MVR Data"
                         self.mvr_tag_display = ListDisplay()
                         yield self.mvr_tag_display
                         self.mvr_fixtures_display = DictListDisplay()
                         yield self.mvr_fixtures_display
                     yield Divider(id="panel_divider")
-                    with Vertical(id="right"):
+                    with Vertical(id="right") as v:
+                        v.border_title = "Uptime Kuma Data"
                         with Grid(id="kuma_header"):
                             yield Input(
                                 placeholder="Filter tags",

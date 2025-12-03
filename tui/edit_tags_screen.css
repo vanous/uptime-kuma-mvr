@@ -3,9 +3,12 @@ EditTagsScreen {
 }
 
 EditTagsScreen #dialog {
+    border-title-align:center;
     padding: 0;
     width: 70;
-    height: 30;
+    height: auto;
+    min-height: 20;
+    max-height: 80%;
     border: round white;
     background: $surface;
 }
@@ -15,9 +18,10 @@ EditTagsScreen #question {
 }
 
 EditTagsScreen #edit_tags_filter_row {
-    height: 1;
+    height: auto;
     width: 100%;
     padding: 0 1 0 1;
+    margin-bottom: 1;
 }
 
 EditTagsScreen #edit_tags_filter {
@@ -31,10 +35,11 @@ EditTagsScreen #edit_tags_filter {
 }
 
 EditTagsScreen #edit_tags_list {
-    height: 100%;
+    height: 1fr;
     width: 100%;
     overflow-y: auto;
     background: #111;
+    margin-bottom: 1;
 }
 
 .edit-tag-option {
@@ -49,8 +54,10 @@ EditTagsScreen #edit_tags_list {
 
 EditTagsScreen #edit_tags_actions {
     width: 100%;
+    height: auto;
 }
 
 EditTagsScreen #edit_tags_actions Button {
-    width: 50%;
+    width: 1fr;
+    padding: 0;
 }

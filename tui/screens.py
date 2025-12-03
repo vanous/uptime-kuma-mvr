@@ -338,8 +338,8 @@ class AddTagScreen(ModalScreen[dict]):
     ]
 
     def compose(self) -> ComposeResult:
-        with Grid(id="dialog"):
-            yield Static("Add Tag", id="question")
+        with Vertical(id="dialog") as v:
+            v.border_title = "Add Tag"
             with Vertical(id="fields"):
                 yield Input(placeholder="Enter tag name", id="name")
             with Horizontal(id="actions"):
@@ -405,8 +405,8 @@ class EditTagsScreen(ModalScreen[dict]):
         self.filter_text = ""
 
     def compose(self) -> ComposeResult:
-        with Grid(id="dialog"):
-            yield Static("Edit Tags", id="question")
+        with Vertical(id="dialog") as v:
+            v.border_title = "Edit Tags"
             with Horizontal(id="edit_tags_filter_row"):
                 yield Input(
                     placeholder="Filter tags",
@@ -415,12 +415,20 @@ class EditTagsScreen(ModalScreen[dict]):
             self.list_container = VerticalScroll(id="edit_tags_list")
             yield self.list_container
             with Horizontal(id="edit_tags_actions"):
-                yield Button("OK", id="ok", variant="success", classes="small_button")
-                yield Button(
-                    "Cancel", id="cancel", variant="error", classes="small_button"
-                )
+                yield Button("OK", id="ok", classes="small_button")
+                yield Button("Cancel", id="cancel", classes="small_button")
 
     def on_mount(self) -> None:
+        if self.app.singleline_ui_toggle:
+            for button in self.query("Button"):
+                button.remove_class("big_button")
+                button.add_class("small_button")
+                button.refresh(layout=True)  # Force refresh if needed
+        else:
+            for button in self.query("Button"):
+                button.remove_class("small_button")
+                button.add_class("big_button")
+                button.refresh(layout=True)  # Force refresh if needed
         self.refresh_list()
 
     def refresh_list(self) -> None:

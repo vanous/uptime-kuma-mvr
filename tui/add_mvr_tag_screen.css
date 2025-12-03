@@ -3,23 +3,28 @@ AddTagScreen {
 }
 
 AddTagScreen #dialog {
+    border-title-align:center;
     padding: 0;
     width: 60;
-    height: 16;
+    height: auto;
+    max-height: 80%;
     border: round white;
     background: $surface;
 }
 
 AddTagScreen #actions {
     width: 100%;
+    height: auto;
 }
 
 AddTagScreen #actions Button {
     width: 1fr;
+    padding: 0;
 }
 
 AddTagScreen #fields {
-    padding: 1 1 0 1;
+    padding: 1;
+    height: auto;
 }
 
 AddTagScreen #name {
@@ -27,5 +32,7 @@ AddTagScreen #name {
 }
 
 AddTagScreen #question {
-    padding: 0 0 0 1;
+    align: center middle;
+    padding: 0;
+    margin: 0;
 }
