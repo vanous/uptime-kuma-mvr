@@ -1,8 +1,8 @@
-AddMvrTagScreen {
+AddTagScreen {
     align: center middle;
 }
 
-AddMvrTagScreen #dialog {
+AddTagScreen #dialog {
     padding: 0;
     width: 60;
     height: 16;
@@ -10,22 +10,22 @@ AddMvrTagScreen #dialog {
     background: $surface;
 }
 
-AddMvrTagScreen #actions {
+AddTagScreen #actions {
     width: 100%;
 }
 
-AddMvrTagScreen #actions Button {
+AddTagScreen #actions Button {
     width: 1fr;
 }
 
-AddMvrTagScreen #fields {
+AddTagScreen #fields {
     padding: 1 1 0 1;
 }
 
-AddMvrTagScreen #name {
+AddTagScreen #name {
     width: 100%;
 }
 
-AddMvrTagScreen #question {
+AddTagScreen #question {
     padding: 0 0 0 1;
 }

@@ -21,6 +21,7 @@ from textual.app import ComposeResult
 from textual.containers import Grid, Horizontal, Vertical
 from textual.widgets import Button, Static, Input, Label, Checkbox, Select
 from textual.containers import VerticalScroll
+from textual import events
 from textual import on, work, events
 from textual_fspicker import FileOpen, Filters
 from tui.messages import Errors, DevicesDiscovered
@@ -326,8 +327,8 @@ class AddMonitorsScreen(ModalScreen[dict]):
             self.dismiss(data)  # Close the modal
 
 
-class AddMvrTagScreen(ModalScreen[dict]):
-    """Simple screen to add a new MVR tag."""
+class AddTagScreen(ModalScreen[dict]):
+    """Simple screen to add a new tag."""
 
     BINDINGS = [
         ("left", "focus_previous", "Focus Previous"),
@@ -338,12 +339,14 @@ class AddMvrTagScreen(ModalScreen[dict]):
 
     def compose(self) -> ComposeResult:
         with Grid(id="dialog"):
-            yield Static("Add MVR Tag", id="question")
+            yield Static("Add Tag", id="question")
             with Vertical(id="fields"):
-                yield Input(placeholder="Enter class name", id="name")
+                yield Input(placeholder="Enter tag name", id="name")
             with Horizontal(id="actions"):
                 yield Button("Add", id="add", variant="success", classes="small_button")
-                yield Button("Cancel", id="cancel", variant="error", classes="small_button")
+                yield Button(
+                    "Cancel", id="cancel", variant="error", classes="small_button"
+                )
 
     def on_mount(self) -> None:
         if self.app.singleline_ui_toggle:
@@ -413,7 +416,9 @@ class EditTagsScreen(ModalScreen[dict]):
             yield self.list_container
             with Horizontal(id="edit_tags_actions"):
                 yield Button("OK", id="ok", variant="success", classes="small_button")
-                yield Button("Cancel", id="cancel", variant="error", classes="small_button")
+                yield Button(
+                    "Cancel", id="cancel", variant="error", classes="small_button"
+                )
 
     def on_mount(self) -> None:
         self.refresh_list()
@@ -429,9 +434,13 @@ class EditTagsScreen(ModalScreen[dict]):
             haystack = f"{name} {uuid}".lower()
             if filter_value and filter_value not in haystack:
                 continue
-            checkbox = Checkbox(name, value=(name in self.selected), classes="edit-tag-option")
+            checkbox = Checkbox(
+                name, value=(name in self.selected), classes="edit-tag-option"
+            )
             checkbox.data = name
             self.list_container.mount(checkbox)
+        if self.list_container:
+            self.list_container.can_focus = False
 
     @on(Input.Changed, "#edit_tags_filter")
     def filter_changed(self, event: Input.Changed) -> None:
@@ -450,9 +459,9 @@ class EditTagsScreen(ModalScreen[dict]):
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "ok":
-            self.dismiss({"selected": list(self.selected)})
+            self.dismiss({"selected": list(self.selected), "exit": False})
         else:
-            self.dismiss({})
+            self.dismiss({"exit": True})
 
     def action_focus_next(self) -> None:
         self.focus_next()
@@ -462,7 +471,24 @@ class EditTagsScreen(ModalScreen[dict]):
 
     async def on_key(self, event: events.Key) -> None:
         if event.key == "escape":
-            self.dismiss({})
+            self.dismiss({"exit": True})
+            return
+        if event.key in ("up", "down"):
+            await self._move_focus(-1 if event.key == "up" else 1)
+            event.stop()
+
+    async def _move_focus(self, delta: int) -> None:
+        if not self.list_container:
+            return
+        checkboxes = list(self.list_container.query("Checkbox"))
+        if not checkboxes:
+            return
+        current_index = next((i for i, cb in enumerate(checkboxes) if cb.has_focus), -1)
+        if current_index == -1:
+            target = 0 if delta > 0 else len(checkboxes) - 1
+        else:
+            target = max(0, min(len(checkboxes) - 1, current_index + delta))
+        checkboxes[target].focus()
 
 
 class MVRScreen(ModalScreen):

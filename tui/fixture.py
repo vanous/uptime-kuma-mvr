@@ -35,7 +35,6 @@ class KumaTag:
             return
         self.id = data.get("id", 0)
         self.name = data.get("name", "")
-        self.uuid = data.get("uuid", 0)
 
     def __str__(self):
         return f"{self.name=} {self.id=}"

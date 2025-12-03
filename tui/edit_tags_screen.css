@@ -5,7 +5,7 @@ EditTagsScreen {
 EditTagsScreen #dialog {
     padding: 0;
     width: 70;
-    height: 20;
+    height: 30;
     border: round white;
     background: $surface;
 }

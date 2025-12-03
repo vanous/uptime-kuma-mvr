@@ -32,7 +32,7 @@ DictListDisplay {
     height: 1;
     margin: 0;
     padding: 0 1;
-    width: 80%;
+    width: 100%;
     background: #444;
     color: white;
     border: none;
@@ -42,18 +42,6 @@ DictListDisplay {
 #mvr_filter_row {
     height: 1;
     width: 100%;
-}
-
-#apply_mvr_filter {
-    height: 1;
-    width: 20%;
-    padding: 0;
-    background: yellow;
-    color: black;
-    border: none;
-    text-style: bold;
-    content-align: center middle;
-    align: center middle;
 }
 
 #mvr_fixture_list {
@@ -141,7 +129,7 @@ MVRtoKuma .big_button {
     padding-right: 1;
 }
 
-#add_mvr_tag {
+.tag_header_button {
     height: 1;
     min-width: 10;
     padding: 0 2;
@@ -153,7 +141,28 @@ MVRtoKuma .big_button {
     outline: none;
 }
 
-.tag_header_button {
+#kuma_header {
+    grid-size: 2 1;
+    grid-columns: 1fr auto;
+    height: 1;
+    align: left middle;
+    padding-left: 1;
+    padding-right: 1;
+}
+
+#kuma_tag_filter {
+    height: 1;
+    margin: 0;
+    padding: 0 1;
+    width: 100%;
+    background: #444;
+    color: white;
+    border: none;
+    outline: none;
+    content-align: left middle;
+}
+
+#add_kuma_tag {
     height: 1;
     min-width: 10;
     padding: 0 2;
@@ -163,6 +172,52 @@ MVRtoKuma .big_button {
     text-style: bold;
     content-align: center middle;
     outline: none;
+}
+
+#kuma_filter_row {
+    height: 1;
+    width: 100%;
+}
+
+#kuma_fixture_filter {
+    height: 1;
+    margin: 0;
+    padding: 0 1;
+    width: 80%;
+    background: #444;
+    color: white;
+    border: none;
+    outline: none;
+    content-align: left middle;
+}
+
+#apply_kuma_tags {
+    height: 1;
+    width: 20%;
+    padding: 0;
+    background: yellow;
+    color: black;
+    border: none;
+    text-style: bold;
+    content-align: center middle;
+    align: center middle;
+}
+
+#kuma_fixture_list {
+    height: 100%;
+    width: 100%;
+    overflow-y: auto;
+    background: #111;
+}
+
+.kuma-fixture-option {
+    height: 1;
+    padding: 0;
+    content-align: left middle;
+    color: white;
+    background: #222;
+    width: 100%;
+    border: none;
 }
 
 Grid#action_buttons { 

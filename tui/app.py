@@ -24,7 +24,7 @@ import subprocess
 import uuid
 from types import SimpleNamespace
 from textual.app import App, ComposeResult
-from textual import on, work
+from textual import on, work, events
 from textual.containers import Horizontal, Vertical, VerticalScroll, Grid
 from textual.widgets import (
     Header,
@@ -41,7 +41,7 @@ from tui.screens import (
     ConfigScreen,
     DeleteScreen,
     AddMonitorsScreen,
-    AddMvrTagScreen,
+    AddTagScreen,
     EditTagsScreen,
 )
 from uptime_kuma_api import UptimeKumaApi, MonitorType, UptimeKumaException
@@ -87,13 +87,8 @@ class DictListDisplay(Vertical):
                 placeholder="Filter by name or IP",
                 id="mvr_fixture_filter",
             )
-            yield Button(
-                "Tags",
-                id="apply_mvr_filter",
-                classes="filter_button",
-                disabled=True,
-            )
         self.list_container = VerticalScroll(id="mvr_fixture_list")
+        self.list_container.can_focus = False  # keep focus on checkboxes
         yield self.list_container
 
     def update_items(self, items: list):
@@ -110,7 +105,9 @@ class DictListDisplay(Vertical):
         for item in self.items or []:  # layers
             for fixture in item.fixtures or []:
                 url = None
-                for network in getattr(fixture, "addresses", SimpleNamespace(networks=[])).networks:
+                for network in getattr(
+                    fixture, "addresses", SimpleNamespace(networks=[])
+                ).networks:
                     if network.ipv4 is not None:
                         url = network.ipv4
                         break
@@ -135,19 +132,11 @@ class DictListDisplay(Vertical):
                 checkbox.add_class("mvr-fixture-option")
                 self.list_container.mount(checkbox)
         self.selected_ids = current_selected
-        self.update_filter_button_state()
 
     @on(Input.Changed, "#mvr_fixture_filter")
     def on_filter_changed(self, event: Input.Changed) -> None:
         self.filter_text = event.value or ""
         self.refresh_options()
-
-    @on(Button.Pressed, "#apply_mvr_filter")
-    def on_filter_button(self, event: Button.Pressed) -> None:
-        self.filter_text = self.query_one("#mvr_fixture_filter", Input).value or ""
-        self.refresh_options()
-        if hasattr(self.app, "open_edit_tags_modal"):
-            self.app.open_edit_tags_modal(preselected=list(self.selected_ids))
 
     @on(Checkbox.Changed)
     def on_checkbox_changed(self, event: Checkbox.Changed) -> None:
@@ -158,14 +147,130 @@ class DictListDisplay(Vertical):
             self.selected_ids.add(key)
         else:
             self.selected_ids.discard(key)
+
+    async def on_key(self, event: events.Key) -> None:
+        if event.key not in ("up", "down"):
+            return
+        await self._move_focus(-1 if event.key == "up" else 1)
+        event.stop()
+
+    async def _move_focus(self, delta: int) -> None:
+        if not self.list_container:
+            return
+        checkboxes = list(self.list_container.query("Checkbox"))
+        if not checkboxes:
+            return
+        current_index = next((i for i, cb in enumerate(checkboxes) if cb.has_focus), -1)
+        if current_index == -1:
+            target = 0 if delta > 0 else len(checkboxes) - 1
+        else:
+            target = max(0, min(len(checkboxes) - 1, current_index + delta))
+        checkboxes[target].focus()
+
+
+class KumaFixtureListDisplay(Vertical):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.items = []
+        self.filter_text = ""
+        self.list_container: VerticalScroll | None = None
+        self.selected_ids: set[str] = set()
+
+    def compose(self) -> ComposeResult:
+        with Horizontal(id="kuma_filter_row"):
+            yield Input(
+                placeholder="Filter by name or IP",
+                id="kuma_fixture_filter",
+            )
+            yield Button(
+                "Tags",
+                id="apply_kuma_tags",
+                classes="filter_button",
+                disabled=True,
+            )
+        self.list_container = VerticalScroll(id="kuma_fixture_list")
+        self.list_container.can_focus = False  # keep focus on checkboxes
+        yield self.list_container
+
+    def update_items(self, items: list):
+        self.items = items or []
+        self.refresh_options()
+
+    def refresh_options(self):
+        if not self.list_container:
+            return
+        current_selected = set(self.selected_ids)
+        new_selected: set[str] = set()
+        self.list_container.remove_children()
+        filter_value = self.filter_text.lower()
+        for fixture in self.items:
+            name = fixture.name
+            uuid = fixture.uuid
+            if not uuid:
+                continue
+            tags = fixture.tags
+            if filter_value and filter_value.lower() not in name.lower():
+                continue
+            label = f"{name} {tags}" if tags else name
+            key = str(uuid)
+            is_selected = key in current_selected
+            if is_selected:
+                new_selected.add(key)
+            checkbox = Checkbox(label, value=is_selected)
+            checkbox.data = key
+            checkbox.add_class("kuma-fixture-option")
+            self.list_container.mount(checkbox)
+        self.selected_ids = new_selected
+        self.update_filter_button_state()
+
+    @on(Input.Changed, "#kuma_fixture_filter")
+    def on_filter_changed(self, event: Input.Changed) -> None:
+        self.filter_text = event.value or ""
+        self.refresh_options()
+
+    @on(Button.Pressed, "#apply_kuma_tags")
+    def on_filter_button(self, event: Button.Pressed) -> None:
+        self.filter_text = self.query_one("#kuma_fixture_filter", Input).value or ""
+        self.refresh_options()
+        self.app.open_edit_kuma_tags_modal(selected_fixture_ids=list(self.selected_ids))
+
+    @on(Checkbox.Changed)
+    def on_checkbox_changed(self, event: Checkbox.Changed) -> None:
+        if not event.checkbox.has_class("kuma-fixture-option"):
+            return
+        key = getattr(event.checkbox, "data", "")
+        print(f"{key=}")
+        if event.value:
+            self.selected_ids.add(key)
+        else:
+            self.selected_ids.discard(key)
         self.update_filter_button_state()
 
     def update_filter_button_state(self):
         try:
-            btn = self.query_one("#apply_mvr_filter", Button)
+            btn = self.query_one("#apply_kuma_tags", Button)
             btn.disabled = len(self.selected_ids) == 0
         except Exception:
             pass
+
+    async def on_key(self, event: events.Key) -> None:
+        if event.key not in ("up", "down"):
+            return
+        await self._move_focus(-1 if event.key == "up" else 1)
+        event.stop()
+
+    async def _move_focus(self, delta: int) -> None:
+        if not self.list_container:
+            return
+        checkboxes = list(self.list_container.query("Checkbox"))
+        if not checkboxes:
+            return
+        current_index = next((i for i, cb in enumerate(checkboxes) if cb.has_focus), -1)
+        if current_index == -1:
+            target = 0 if delta > 0 else len(checkboxes) - 1
+        else:
+            target = max(0, min(len(checkboxes) - 1, current_index + delta))
+        checkboxes[target].focus()
 
 
 class MonitorsFetched(Message):
@@ -224,7 +329,8 @@ class MVRtoKuma(App):
     kuma_fixtures = []
     kuma_tags = []
     tags = []
-    selected_tags = set()
+    kuma_tag_filter: str = ""
+    selected_kuma_tags: set[str] = set()
     mvr_fixtures = []
     mvr_classes = []
     mvr_positions = []
@@ -257,20 +363,24 @@ class MVRtoKuma(App):
                     with Vertical(id="left"):
                         with Grid(id="mvr_header"):
                             yield Static("[b]MVR data:[/b]")
-                            yield Button(
-                                "Add Tag",
-                                id="add_mvr_tag",
-                                classes="small_button tag_header_button",
-                            )
                         self.mvr_tag_display = ListDisplay()
                         yield self.mvr_tag_display
                         self.mvr_fixtures_display = DictListDisplay()
                         yield self.mvr_fixtures_display
                     with Vertical(id="right"):
-                        yield Static("[b]Uptime Kuma data:[/b]")
+                        with Grid(id="kuma_header"):
+                            yield Input(
+                                placeholder="Filter tags",
+                                id="kuma_tag_filter",
+                            )
+                            yield Button(
+                                "Add Tag",
+                                id="add_kuma_tag",
+                                classes="small_button tag_header_button",
+                            )
                         self.kuma_tag_display = ListDisplay()
                         yield self.kuma_tag_display
-                        self.kuma_fixtures_display = ListDisplay()
+                        self.kuma_fixtures_display = KumaFixtureListDisplay()
                         yield self.kuma_fixtures_display
 
             with Grid(id="action_buttons"):
@@ -367,8 +477,8 @@ class MVRtoKuma(App):
             self.run_api_delete_tags()
             self.disable_buttons()
 
-        if event.button.id == "add_mvr_tag":
-            self.open_add_tag_modal()
+        if event.button.id == "add_kuma_tag":
+            self.open_add_kuma_tag_modal()
 
         if event.button.id == "get_button":
             self.query_one("#json_output").update("Calling API via script...")
@@ -452,14 +562,19 @@ class MVRtoKuma(App):
         self.kuma_fixtures_display.update_items(self.kuma_fixtures)
         self.enable_buttons()
 
-    def on_tags_fetched(self, message: MonitorsFetched) -> None:
+    def on_tags_fetched(self, message: TagsFetched) -> None:
         # output_widget = self.query_one("#json_output", Static)
         # self.query_one("#get_button", Button).disabled = False
 
         # formatted = json.dumps(message.tags, indent=2)
         # output_widget.update(f"[green]Tags Fetched:[/green]\n{formatted}")
         self.kuma_tags = [KumaTag(t) for t in message.tags]
-        self.kuma_tag_display.update_items(self.kuma_tags)
+        # reset filter on fresh fetch
+        try:
+            self.kuma_tag_filter = self.query_one("#kuma_tag_filter", Input).value
+        except Exception:
+            self.kuma_tag_filter = ""
+        self.update_kuma_tag_display()
         self.enable_buttons()
 
     def on_mvr_parsed(self, message: MvrParsed) -> None:
@@ -489,7 +604,32 @@ class MVRtoKuma(App):
             + [layer.layer for layer in self.mvr_fixtures]
         )
         self.mvr_tag_display.update_items(self.tags)
-        self.selected_tags = set()
+
+    def update_kuma_tag_display(self):
+        """Refresh Kuma tags with current filter."""
+        if not self.kuma_tags:
+            self.kuma_tag_display.update_items([])
+            return
+        filter_value = (self.kuma_tag_filter or "").lower()
+        filtered = []
+        for tag in self.kuma_tags:
+            name = getattr(tag, "name", "") or ""
+            uuid = getattr(tag, "uuid", "") or ""
+            haystack = f"{name} {uuid}".lower()
+            if filter_value and filter_value not in haystack:
+                continue
+            filtered.append(tag)
+        self.kuma_tag_display.update_items(filtered)
+        try:
+            btn = self.query_one("#apply_kuma_tags", Button)
+            btn.disabled = False
+        except Exception:
+            pass
+
+    @on(Input.Changed, "#kuma_tag_filter")
+    def on_kuma_tag_filter_changed(self, event: Input.Changed) -> None:
+        self.kuma_tag_filter = event.value or ""
+        self.update_kuma_tag_display()
 
     @work(thread=True)
     async def run_api_get_data(self) -> str:
@@ -506,6 +646,7 @@ class MVRtoKuma(App):
             return
         try:
             monitors = api.get_monitors()
+            print(monitors)
             # You can now emit a message or update reactive variables
             self.post_message(MonitorsFetched(monitors=monitors))
         except Exception as e:
@@ -736,6 +877,77 @@ class MVRtoKuma(App):
                 api.disconnect()
 
     @work(thread=True)
+    async def run_api_add_tags_to_monitors(
+        self, monitors: [KumaFixture], tags: [KumaTag]
+    ):
+        # Safe to call blocking code here
+        api = None
+        try:
+            api = UptimeKumaApi(self.url, timeout=int(self.timeout))
+            api.login(self.username, self.password)
+        except Exception as e:
+            print("error!!!!!", traceback.print_exception(e))
+            self.post_message(Errors(error=str(e)))
+
+        if not api:
+            self.post_message(Errors(error="Not logged in"))
+            return
+        selected_tag_names = [tag.name for tag in tags]
+        for monitor in monitors:
+            print(f"{monitor.id=}, {monitor.tags=}")
+            for tag in tags:
+                print(f"{tag.id=}, {tag=}")
+                if tag.name in monitor.tags:
+                    print(f"skip {tag.id}")
+                    continue
+                try:
+                    api.add_monitor_tag(
+                        monitor_id=monitor.id,
+                        tag_id=tag.id,
+                    )
+                except Exception as e:
+                    print("error!!!!!", traceback.print_exception(e))
+            for tag_name in monitor.tags:
+                if tag_name not in selected_tag_names:
+                    for t in self.kuma_tags:
+                        if t.name == tag_name:
+                            try:
+                                api.delete_monitor_tag(
+                                    monitor_id=monitor.id, tag_id=t.id
+                                )
+                            except exception as e:
+                                print("error!!!!!", traceback.print_exception(e))
+
+        if api:
+            api.disconnect()
+
+    @work(thread=True)
+    async def run_api_create_tag(self, tag: KumaTag):
+        # Safe to call blocking code here
+        api = None
+        try:
+            api = UptimeKumaApi(self.url, timeout=int(self.timeout))
+            api.login(self.username, self.password)
+        except Exception as e:
+            print("error!!!!!", traceback.print_exception(e))
+            self.post_message(Errors(error=str(e)))
+
+        if not api:
+            self.post_message(Errors(error="Not logged in"))
+            return
+        try:
+            api.add_tag(
+                name=tag.name,
+                color="#{:06x}".format(random.randint(0, 0xFFFFFF)),
+            )
+        except Exception as e:
+            print("error!!!!!", traceback.print_exception(e))
+            self.post_message(Errors(error=str(e)))
+        finally:
+            if api:
+                api.disconnect()
+
+    @work(thread=True)
     async def run_api_create_tags(self) -> str:
         # Safe to call blocking code here
         api = None
@@ -798,7 +1010,9 @@ class MVRtoKuma(App):
         """Called when the worker state changes."""
         if event.worker.name in [
             "run_api_delete_tags",
+            "run_api_add_tags_to_monitors",
             "run_api_create_tags",
+            "run_api_create_tag",
             "run_api_create_monitors",
             "run_api_delete_monitors",
         ]:
@@ -826,33 +1040,48 @@ class MVRtoKuma(App):
             self.query_one("#open_create_monitors").disabled = True
             self.query_one("#delete_screen").disabled = True
 
-    def open_add_tag_modal(self):
+    def open_add_kuma_tag_modal(self):
         def add_tag(data: dict) -> None:
             if data and data.get("name"):
-                class_ns = SimpleNamespace(
-                    uuid=str(uuid.uuid4()),
-                    name=data["name"],
-                    id="",
-                )
-                self.mvr_classes.append(class_ns)
-                self.update_mvr_tag_display()
+                tag = KumaTag({"name": data["name"]})
+                self.run_api_create_tag(tag)
 
-        self.push_screen(AddMvrTagScreen(), add_tag)
+        self.push_screen(AddTagScreen(), add_tag)
 
-    def open_edit_tags_modal(self, preselected: list[str] | None = None):
-        preselected = preselected or list(self.selected_tags)
+    def open_edit_kuma_tags_modal(self, selected_fixture_ids: list[str] | None = None):
+        """Open tag editor for the currently selected fixtures."""
+        selected_fixture_ids = selected_fixture_ids or []
+        if not selected_fixture_ids:
+            return
+
+        gathered_tag_names = set()
+        for fixture in self.kuma_fixtures:
+            uuid = fixture.uuid
+            if not uuid:
+                continue
+            if uuid in selected_fixture_ids:
+                gathered_tag_names.update(fixture.tags)
+        initial_selected_tags = sorted(gathered_tag_names)
 
         def save_selection(data: dict) -> None:
-            if data and data.get("selected"):
-                self.selected_tags = set(data["selected"])
-            else:
-                self.selected_tags = set()
-
+            is_exit = data.get("exit", True)
+            if is_exit:
+                return
+            selected_tags = set(data.get("selected", [])) if data else set()
+            fixtures_to_update = [
+                fixture
+                for fixture in self.kuma_fixtures
+                if fixture.uuid in selected_fixture_ids
+            ]
+            tags_to_use = [tag for tag in self.kuma_tags if tag.name in selected_tags]
+            self.run_api_add_tags_to_monitors(fixtures_to_update, tags_to_use)
+        
+        print("LLL", initial_selected_tags)
         self.push_screen(
             EditTagsScreen(
                 data={
-                    "tags": self.tags,
-                    "selected": preselected,
+                    "tags": self.kuma_tags,
+                    "selected": initial_selected_tags,
                 }
             ),
             save_selection,
