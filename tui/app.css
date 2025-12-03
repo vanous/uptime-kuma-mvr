@@ -25,8 +25,53 @@ ListDisplay {
 
 DictListDisplay {
     height: 50%;
-    overflow-y: scroll;
     width: 100%;
+}
+
+#mvr_fixture_filter {
+    height: 1;
+    margin: 0;
+    padding: 0 1;
+    width: 80%;
+    background: #444;
+    color: white;
+    border: none;
+    content-align: left middle;
+}
+
+#mvr_filter_row {
+    height: 1;
+    width: 100%;
+}
+
+#apply_mvr_filter {
+    height: 1;
+    width: 20%;
+    padding: 0;
+    background: yellow;
+    color: black;
+    border: none;
+    text-style: bold;
+    content-align: center middle;
+    align: center middle;
+}
+
+#mvr_fixture_list {
+    height: 100%;
+    width: 100%;
+    overflow-y: auto;
+    background: #111;
+}
+
+.mvr-fixture-option {
+    height: auto;
+    min-height: 1;
+    padding: 0;
+    content-align: left middle;
+    color: white;
+    background: #222;
+    width: 100%;
+    border: none;
 }
 #json_output {
     border: round white;
@@ -86,6 +131,39 @@ MVRtoKuma .big_button {
         width: 1fr;
         height: 100%;
     }
+
+#mvr_header {
+    grid-size: 2 1;
+    grid-columns: 1fr auto;
+    height: 1;
+    align: left middle;
+    padding-left: 1;
+    padding-right: 1;
+}
+
+#add_mvr_tag {
+    height: 1;
+    min-width: 10;
+    padding: 0 2;
+    border: none;
+    background: yellow;
+    color: black;
+    text-style: bold;
+    content-align: center middle;
+    outline: none;
+}
+
+.tag_header_button {
+    height: 1;
+    min-width: 10;
+    padding: 0 2;
+    border: none;
+    background: yellow;
+    color: black;
+    text-style: bold;
+    content-align: center middle;
+    outline: none;
+}
 
 Grid#action_buttons { 
 grid-size: 4 4; 

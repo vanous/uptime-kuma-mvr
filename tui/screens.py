@@ -20,6 +20,7 @@ from textual.screen import ModalScreen
 from textual.app import ComposeResult
 from textual.containers import Grid, Horizontal, Vertical
 from textual.widgets import Button, Static, Input, Label, Checkbox, Select
+from textual.containers import VerticalScroll
 from textual import on, work, events
 from textual_fspicker import FileOpen, Filters
 from tui.messages import Errors, DevicesDiscovered
@@ -325,6 +326,145 @@ class AddMonitorsScreen(ModalScreen[dict]):
             self.dismiss(data)  # Close the modal
 
 
+class AddMvrTagScreen(ModalScreen[dict]):
+    """Simple screen to add a new MVR tag."""
+
+    BINDINGS = [
+        ("left", "focus_previous", "Focus Previous"),
+        ("right", "focus_next", "Focus Next"),
+        ("up", "focus_previous", "Focus Previous"),
+        ("down", "focus_next", "Focus Next"),
+    ]
+
+    def compose(self) -> ComposeResult:
+        with Grid(id="dialog"):
+            yield Static("Add MVR Tag", id="question")
+            with Vertical(id="fields"):
+                yield Input(placeholder="Enter class name", id="name")
+            with Horizontal(id="actions"):
+                yield Button("Add", id="add", variant="success", classes="small_button")
+                yield Button("Cancel", id="cancel", variant="error", classes="small_button")
+
+    def on_mount(self) -> None:
+        if self.app.singleline_ui_toggle:
+            for button in self.query("Button"):
+                button.remove_class("big_button")
+                button.add_class("small_button")
+                button.refresh(layout=True)  # Force refresh if needed
+        else:
+            for button in self.query("Button"):
+                button.remove_class("small_button")
+                button.add_class("big_button")
+                button.refresh(layout=True)  # Force refresh if needed
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        self.submit_tag(event.button.id)
+
+    def submit_tag(self, source: str) -> None:
+        if source == "add":
+            name = self.query_one("#name", Input).value.strip()
+            if name:
+                self.dismiss({"name": name})
+            else:
+                self.dismiss({})
+        else:
+            self.dismiss({})
+
+    def action_focus_next(self) -> None:
+        self.focus_next()
+
+    def action_focus_previous(self) -> None:
+        self.focus_previous()
+
+    async def on_key(self, event: events.Key) -> None:
+        if event.key == "enter":
+            self.submit_tag("add")
+            return
+        if event.key == "escape":
+            self.dismiss({})  # Close the modal
+
+
+class EditTagsScreen(ModalScreen[dict]):
+    """Screen to edit tags with filtering and multi-selection."""
+
+    BINDINGS = [
+        ("left", "focus_previous", "Focus Previous"),
+        ("right", "focus_next", "Focus Next"),
+        ("up", "focus_previous", "Focus Previous"),
+        ("down", "focus_next", "Focus Next"),
+    ]
+
+    def __init__(self, data: dict | None = None) -> None:
+        super().__init__()
+        self.tags = data.get("tags", []) if data else []
+        self.selected = set(data.get("selected", [])) if data else set()
+        self.list_container = None
+        self.filter_text = ""
+
+    def compose(self) -> ComposeResult:
+        with Grid(id="dialog"):
+            yield Static("Edit Tags", id="question")
+            with Horizontal(id="edit_tags_filter_row"):
+                yield Input(
+                    placeholder="Filter tags",
+                    id="edit_tags_filter",
+                )
+            self.list_container = VerticalScroll(id="edit_tags_list")
+            yield self.list_container
+            with Horizontal(id="edit_tags_actions"):
+                yield Button("OK", id="ok", variant="success", classes="small_button")
+                yield Button("Cancel", id="cancel", variant="error", classes="small_button")
+
+    def on_mount(self) -> None:
+        self.refresh_list()
+
+    def refresh_list(self) -> None:
+        if not self.list_container:
+            return
+        self.list_container.remove_children()
+        filter_value = (self.filter_text or "").lower()
+        for tag in self.tags or []:
+            name = getattr(tag, "name", str(tag))
+            uuid = getattr(tag, "uuid", "")
+            haystack = f"{name} {uuid}".lower()
+            if filter_value and filter_value not in haystack:
+                continue
+            checkbox = Checkbox(name, value=(name in self.selected), classes="edit-tag-option")
+            checkbox.data = name
+            self.list_container.mount(checkbox)
+
+    @on(Input.Changed, "#edit_tags_filter")
+    def filter_changed(self, event: Input.Changed) -> None:
+        self.filter_text = event.value or ""
+        self.refresh_list()
+
+    @on(Checkbox.Changed)
+    def checkbox_changed(self, event: Checkbox.Changed) -> None:
+        if not event.checkbox.has_class("edit-tag-option"):
+            return
+        name = getattr(event.checkbox, "data", "")
+        if event.value:
+            self.selected.add(name)
+        else:
+            self.selected.discard(name)
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "ok":
+            self.dismiss({"selected": list(self.selected)})
+        else:
+            self.dismiss({})
+
+    def action_focus_next(self) -> None:
+        self.focus_next()
+
+    def action_focus_previous(self) -> None:
+        self.focus_previous()
+
+    async def on_key(self, event: events.Key) -> None:
+        if event.key == "escape":
+            self.dismiss({})
+
+
 class MVRScreen(ModalScreen):
     """Screen with a dialog to confirm quitting."""
 
@@ -362,12 +502,7 @@ class MVRScreen(ModalScreen):
             self.app.mvr_classes = []
             self.app.mvr_positions = []
 
-            self.app.mvr_tag_display.update_items(
-                self.app.mvr_positions
-                + self.app.mvr_classes
-                + [layer.layer for layer in self.app.mvr_fixtures]
-            )
-
+            self.app.update_mvr_tag_display()
             self.app.mvr_fixtures_display.update_items(self.app.mvr_fixtures)
             self.app.query_one("#json_output").update("[green]MVR data cleaned[/green]")
             self.app.query_one("#open_create_monitors").disabled = True

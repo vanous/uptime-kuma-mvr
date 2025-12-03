@@ -1,0 +1,31 @@
+AddMvrTagScreen {
+    align: center middle;
+}
+
+AddMvrTagScreen #dialog {
+    padding: 0;
+    width: 60;
+    height: 16;
+    border: round white;
+    background: $surface;
+}
+
+AddMvrTagScreen #actions {
+    width: 100%;
+}
+
+AddMvrTagScreen #actions Button {
+    width: 1fr;
+}
+
+AddMvrTagScreen #fields {
+    padding: 1 1 0 1;
+}
+
+AddMvrTagScreen #name {
+    width: 100%;
+}
+
+AddMvrTagScreen #question {
+    padding: 0 0 0 1;
+}

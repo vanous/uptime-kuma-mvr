@@ -21,11 +21,19 @@ import os
 import random
 import traceback
 import subprocess
+import uuid
 from types import SimpleNamespace
 from textual.app import App, ComposeResult
 from textual import on, work
 from textual.containers import Horizontal, Vertical, VerticalScroll, Grid
-from textual.widgets import Header, Footer, Input, Button, Static
+from textual.widgets import (
+    Header,
+    Footer,
+    Input,
+    Button,
+    Static,
+    Checkbox,
+)
 from textual.worker import Worker, WorkerState
 from tui.screens import (
     MVRScreen,
@@ -33,6 +41,8 @@ from tui.screens import (
     ConfigScreen,
     DeleteScreen,
     AddMonitorsScreen,
+    AddMvrTagScreen,
+    EditTagsScreen,
 )
 from uptime_kuma_api import UptimeKumaApi, MonitorType, UptimeKumaException
 from textual.message import Message
@@ -64,14 +74,98 @@ class ListDisplay(Vertical):
 
 
 class DictListDisplay(Vertical):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.items = []
+        self.filter_text = ""
+        self.list_container: VerticalScroll | None = None
+        self.selected_ids: set[str] = set()
+
+    def compose(self) -> ComposeResult:
+        with Horizontal(id="mvr_filter_row"):
+            yield Input(
+                placeholder="Filter by name or IP",
+                id="mvr_fixture_filter",
+            )
+            yield Button(
+                "Tags",
+                id="apply_mvr_filter",
+                classes="filter_button",
+                disabled=True,
+            )
+        self.list_container = VerticalScroll(id="mvr_fixture_list")
+        yield self.list_container
+
     def update_items(self, items: list):
-        self.remove_children()
-        for item in items:  # layers
-            for fixture in item.fixtures:
-                if self.app.details_toggle:
-                    self.mount(Static(f"[green]{fixture.name}[/green] {fixture.uuid}"))
-                else:
-                    self.mount(Static(f"[green]{fixture.name}[/green]"))
+        self.items = items or []
+        self.refresh_options()
+
+    def refresh_options(self):
+        if not self.list_container:
+            return
+        # remember existing selections
+        current_selected = set(self.selected_ids)
+        self.list_container.remove_children()
+        filter_value = self.filter_text.lower()
+        for item in self.items or []:  # layers
+            for fixture in item.fixtures or []:
+                url = None
+                for network in getattr(fixture, "addresses", SimpleNamespace(networks=[])).networks:
+                    if network.ipv4 is not None:
+                        url = network.ipv4
+                        break
+                name = getattr(fixture, "name", "") or ""
+                layer_name = getattr(item, "layer", SimpleNamespace(name="")).name or ""
+                key = (fixture.uuid or name or url or layer_name or "").strip()
+                search_blob = " ".join(
+                    str(part)
+                    for part in [
+                        name,
+                        url or "",
+                        getattr(fixture, "uuid", "") or "",
+                        layer_name,
+                    ]
+                    if part
+                ).lower()
+                if filter_value and filter_value not in search_blob:
+                    continue
+                label = f"{name}{f' {url}' if url else ''}"
+                checkbox = Checkbox(label, value=key in current_selected)
+                checkbox.data = key
+                checkbox.add_class("mvr-fixture-option")
+                self.list_container.mount(checkbox)
+        self.selected_ids = current_selected
+        self.update_filter_button_state()
+
+    @on(Input.Changed, "#mvr_fixture_filter")
+    def on_filter_changed(self, event: Input.Changed) -> None:
+        self.filter_text = event.value or ""
+        self.refresh_options()
+
+    @on(Button.Pressed, "#apply_mvr_filter")
+    def on_filter_button(self, event: Button.Pressed) -> None:
+        self.filter_text = self.query_one("#mvr_fixture_filter", Input).value or ""
+        self.refresh_options()
+        if hasattr(self.app, "open_edit_tags_modal"):
+            self.app.open_edit_tags_modal(preselected=list(self.selected_ids))
+
+    @on(Checkbox.Changed)
+    def on_checkbox_changed(self, event: Checkbox.Changed) -> None:
+        if not event.checkbox.has_class("mvr-fixture-option"):
+            return
+        key = getattr(event.checkbox, "data", "")
+        if event.value:
+            self.selected_ids.add(key)
+        else:
+            self.selected_ids.discard(key)
+        self.update_filter_button_state()
+
+    def update_filter_button_state(self):
+        try:
+            btn = self.query_one("#apply_mvr_filter", Button)
+            btn.disabled = len(self.selected_ids) == 0
+        except Exception:
+            pass
 
 
 class MonitorsFetched(Message):
@@ -102,6 +196,8 @@ class MVRtoKuma(App):
         "mvr_screen.css",
         "mvr_merge_screen.css",
         "artnet_screen.css",
+        "add_mvr_tag_screen.css",
+        "edit_tags_screen.css",
     ]
     BINDINGS = [
         ("left", "focus_previous", "Focus Previous"),
@@ -127,6 +223,8 @@ class MVRtoKuma(App):
 
     kuma_fixtures = []
     kuma_tags = []
+    tags = []
+    selected_tags = set()
     mvr_fixtures = []
     mvr_classes = []
     mvr_positions = []
@@ -157,7 +255,13 @@ class MVRtoKuma(App):
                 )
                 with Horizontal():
                     with Vertical(id="left"):
-                        yield Static("[b]MVR data:[/b]")
+                        with Grid(id="mvr_header"):
+                            yield Static("[b]MVR data:[/b]")
+                            yield Button(
+                                "Add Tag",
+                                id="add_mvr_tag",
+                                classes="small_button tag_header_button",
+                            )
                         self.mvr_tag_display = ListDisplay()
                         yield self.mvr_tag_display
                         self.mvr_fixtures_display = DictListDisplay()
@@ -263,6 +367,9 @@ class MVRtoKuma(App):
             self.run_api_delete_tags()
             self.disable_buttons()
 
+        if event.button.id == "add_mvr_tag":
+            self.open_add_tag_modal()
+
         if event.button.id == "get_button":
             self.query_one("#json_output").update("Calling API via script...")
             self.run_api_get_data()
@@ -295,12 +402,7 @@ class MVRtoKuma(App):
                         f"{f'Configuration loaded, Server: [blue]{self.url}[/blue]' if self.url else 'Ready... make sure to Configure Uptime Kuma address and credentials'}"
                     )
 
-                    self.mvr_tag_display.update_items(
-                        self.mvr_positions
-                        + self.mvr_classes
-                        + [layer.layer for layer in self.mvr_fixtures]
-                    )
-
+                    self.update_mvr_tag_display()
                     self.mvr_fixtures_display.update_items(self.mvr_fixtures)
                     self.kuma_fixtures_display.update_items(self.kuma_fixtures)
                     self.kuma_tag_display.update_items(self.kuma_tags)
@@ -356,6 +458,7 @@ class MVRtoKuma(App):
 
         # formatted = json.dumps(message.tags, indent=2)
         # output_widget.update(f"[green]Tags Fetched:[/green]\n{formatted}")
+        self.kuma_tags = [KumaTag(t) for t in message.tags]
         self.kuma_tag_display.update_items(self.kuma_tags)
         self.enable_buttons()
 
@@ -367,12 +470,7 @@ class MVRtoKuma(App):
         self.mvr_classes += message.tags["classes"]
         self.mvr_positions += message.tags["positions"]
 
-        self.mvr_tag_display.update_items(
-            self.mvr_positions
-            + self.mvr_classes
-            + [layer.layer for layer in self.mvr_fixtures]
-        )
-
+        self.update_mvr_tag_display()
         self.mvr_fixtures_display.update_items(self.mvr_fixtures)
         self.query_one("#json_output").update("[green]MVR data imported[/green]")
         self.enable_buttons()
@@ -382,6 +480,16 @@ class MVRtoKuma(App):
 
         if message.error:
             output_widget.update(f"[red]Error:[/red] {message.error}")
+
+    def update_mvr_tag_display(self):
+        """Refresh stored tags and update UI."""
+        self.tags = (
+            self.mvr_positions
+            + self.mvr_classes
+            + [layer.layer for layer in self.mvr_fixtures]
+        )
+        self.mvr_tag_display.update_items(self.tags)
+        self.selected_tags = set()
 
     @work(thread=True)
     async def run_api_get_data(self) -> str:
@@ -442,6 +550,7 @@ class MVRtoKuma(App):
                 else:
                     delete = True
                 if delete:
+                    print("Delete", tag.id)
                     api.delete_tag(tag.id)
 
         except Exception as e:
@@ -716,6 +825,38 @@ class MVRtoKuma(App):
             self.query_one("#get_button").disabled = True
             self.query_one("#open_create_monitors").disabled = True
             self.query_one("#delete_screen").disabled = True
+
+    def open_add_tag_modal(self):
+        def add_tag(data: dict) -> None:
+            if data and data.get("name"):
+                class_ns = SimpleNamespace(
+                    uuid=str(uuid.uuid4()),
+                    name=data["name"],
+                    id="",
+                )
+                self.mvr_classes.append(class_ns)
+                self.update_mvr_tag_display()
+
+        self.push_screen(AddMvrTagScreen(), add_tag)
+
+    def open_edit_tags_modal(self, preselected: list[str] | None = None):
+        preselected = preselected or list(self.selected_tags)
+
+        def save_selection(data: dict) -> None:
+            if data and data.get("selected"):
+                self.selected_tags = set(data["selected"])
+            else:
+                self.selected_tags = set()
+
+        self.push_screen(
+            EditTagsScreen(
+                data={
+                    "tags": self.tags,
+                    "selected": preselected,
+                }
+            ),
+            save_selection,
+        )
 
 
 if __name__ == "__main__":
