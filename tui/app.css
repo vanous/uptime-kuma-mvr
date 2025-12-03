@@ -251,3 +251,15 @@ Screen.-narrow Grid#action_buttons { grid-size: 2;}
 Screen.-normal Grid#action_buttons { grid-size: 3; }
 Screen.-wide Grid#action_buttons { grid-size: 4; }
 Screen.-very-wide Grid#action_buttons { grid-size: 6; }
+
+Divider {
+    width: 1;
+    height: 100%;
+    margin-top: 1;
+    margin-bottom: 1;
+    background: $primary-lighten-2;
+}
+
+Divider:hover {
+    background: $primary;
+}

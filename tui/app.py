@@ -44,6 +44,7 @@ from tui.screens import (
     AddTagScreen,
     EditTagsScreen,
 )
+from tui.divider import Divider
 from uptime_kuma_api import UptimeKumaApi, MonitorType, UptimeKumaException
 from textual.message import Message
 from tui.fixture import KumaFixture, KumaTag
@@ -418,6 +419,7 @@ class MVRtoKuma(App):
     layers_toggle = True
     classes_toggle = True
     positions_toggle = True
+    side_panel_width: int = reactive(0, layout=True)
 
     def is_in_classes(self, name):
         for cl in self.mvr_classes:
@@ -440,7 +442,7 @@ class MVRtoKuma(App):
                     "Ready... make sure to Configure Uptime Kuma address and credentials",
                     id="json_output",
                 )
-                with Horizontal():
+                with Horizontal(id="content_split"):
                     with Vertical(id="left"):
                         with Grid(id="mvr_header"):
                             yield Static("[b]MVR data:[/b]")
@@ -448,6 +450,7 @@ class MVRtoKuma(App):
                         yield self.mvr_tag_display
                         self.mvr_fixtures_display = DictListDisplay()
                         yield self.mvr_fixtures_display
+                    yield Divider(id="panel_divider")
                     with Vertical(id="right"):
                         with Grid(id="kuma_header"):
                             yield Input(
@@ -486,6 +489,8 @@ class MVRtoKuma(App):
 
     def on_mount(self) -> None:
         """Load the configuration from the JSON file when the app starts."""
+        # initialize split after the app lays out once
+        self.set_timer(0, self._initialize_side_panel_width)
         if os.path.exists(self.CONFIG_FILE):
             with open(self.CONFIG_FILE, "r") as f:
                 try:
@@ -519,6 +524,17 @@ class MVRtoKuma(App):
                 except json.JSONDecodeError:
                     # Handle empty or invalid JSON file
                     pass
+
+    def _initialize_side_panel_width(self) -> None:
+        """Set an initial splitter position once layout information is available."""
+        try:
+            available_width = self.query_one("#content_split").size.width
+        except Exception:
+            available_width = 0
+        if available_width <= 0:
+            return
+        if not self.side_panel_width:
+            self.side_panel_width = max(20, available_width // 2)
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         """Called when a button is pressed."""
@@ -712,6 +728,24 @@ class MVRtoKuma(App):
         self.kuma_tag_filter = event.value or ""
         self.update_kuma_tag_display()
 
+    @on(Divider.Dragged, "#panel_divider")
+    def handle_divider_dragged(self, event: Divider.Dragged) -> None:
+        """Update the left/right split based on divider drag position."""
+        try:
+            container_region = self.query_one("#content_split").region
+        except Exception:
+            return
+        relative_x = event.x - container_region.x
+        # keep both panes usable
+        min_width = 20
+        max_width = max(
+            min_width,
+            container_region.width
+            - (self.query_one("#panel_divider").size.width or 1)
+            - min_width,
+        )
+        self.side_panel_width = max(min_width, min(relative_x, max_width))
+
     @work(thread=True)
     async def run_api_get_data(self) -> str:
         # Safe to call blocking code here
@@ -727,7 +761,6 @@ class MVRtoKuma(App):
             return
         try:
             monitors = api.get_monitors()
-            print(monitors)
             # You can now emit a message or update reactive variables
             self.post_message(MonitorsFetched(monitors=monitors))
         except Exception as e:
@@ -1105,6 +1138,49 @@ class MVRtoKuma(App):
                 self.query_one("#json_output").update("Server data refreshed")
                 self.enable_buttons()
 
+    def on_resize(self, event: events.Resize) -> None:
+        """Clamp the split when the terminal is resized."""
+        try:
+            available_width = self.query_one("#content_split").size.width
+        except Exception:
+            return
+        if not available_width:
+            return
+        min_width = 20
+        max_width = max(
+            min_width,
+            available_width
+            - (self.query_one("#panel_divider").size.width or 1)
+            - min_width,
+        )
+        if self.side_panel_width > max_width:
+            self.side_panel_width = max_width
+
+    def watch_side_panel_width(self, value: int) -> None:
+        """Apply the current split width to the left/right panes."""
+        try:
+            container = self.query_one("#content_split")
+            left = self.query_one("#left")
+            right = self.query_one("#right")
+            divider = self.query_one("#panel_divider")
+        except Exception:
+            return
+        available_width = container.size.width
+        if not available_width:
+            return
+        divider_width = divider.size.width or 1
+        min_width = 20
+        clamped = max(
+            min_width,
+            min(value, available_width - divider_width - min_width),
+        )
+        if clamped != value:
+            self.side_panel_width = clamped
+            return
+        left.styles.width = clamped
+        right.styles.width = max(min_width, available_width - divider_width - clamped)
+        container.refresh(layout=True)
+
     def disable_buttons(self):
         self.query_one("#get_button").disabled = True
         self.query_one("#open_create_monitors").disabled = True
@@ -1156,7 +1232,7 @@ class MVRtoKuma(App):
             ]
             tags_to_use = [tag for tag in self.kuma_tags if tag.name in selected_tags]
             self.run_api_add_tags_to_monitors(fixtures_to_update, tags_to_use)
-        
+
         print("LLL", initial_selected_tags)
         self.push_screen(
             EditTagsScreen(
