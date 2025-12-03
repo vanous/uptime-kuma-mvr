@@ -28,6 +28,28 @@ DictListDisplay {
     width: 100%;
 }
 
+KumaTagListDisplay {
+    height: 50%;
+    width: 100%;
+}
+
+#kuma_tag_list {
+    height: 100%;
+    width: 100%;
+    overflow-y: auto;
+    background: #111;
+}
+
+.kuma-tag-option {
+    height: 1;
+    padding: 0;
+    content-align: left middle;
+    color: white;
+    background: #222;
+    width: 100%;
+    border: none;
+}
+
 #mvr_fixture_filter {
     height: 1;
     margin: 0;

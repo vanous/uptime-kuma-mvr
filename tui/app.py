@@ -168,6 +168,79 @@ class DictListDisplay(Vertical):
         checkboxes[target].focus()
 
 
+class KumaTagListDisplay(Vertical):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.items = []
+        self.filter_text = ""
+        self.list_container: VerticalScroll | None = None
+        self.selected_names: set[str] = set()
+
+    def compose(self) -> ComposeResult:
+        self.list_container = VerticalScroll(id="kuma_tag_list")
+        self.list_container.can_focus = False
+        yield self.list_container
+
+    def set_filter_text(self, filter_text: str) -> None:
+        self.filter_text = filter_text or ""
+        self.refresh_options()
+
+    def update_items(self, items: list):
+        self.items = items or []
+        valid_names = {getattr(tag, "name", "") or "" for tag in self.items}
+        self.selected_names.intersection_update(valid_names)
+        self.refresh_options()
+        self.app.apply_kuma_tag_filter(self.selected_names)
+
+    def refresh_options(self):
+        if not self.list_container:
+            return
+        self.list_container.remove_children()
+        filter_value = (self.filter_text or "").lower()
+        for tag in self.items:
+            name = getattr(tag, "name", "") or ""
+            uuid = getattr(tag, "uuid", "") or ""
+            haystack = f"{name} {uuid}".lower()
+            if filter_value and filter_value not in haystack:
+                continue
+            checkbox = Checkbox(
+                name, value=(name in self.selected_names), classes="kuma-tag-option"
+            )
+            checkbox.data = name
+            self.list_container.mount(checkbox)
+        self.list_container.can_focus = False
+
+    @on(Checkbox.Changed)
+    def on_checkbox_changed(self, event: Checkbox.Changed) -> None:
+        if not event.checkbox.has_class("kuma-tag-option"):
+            return
+        name = getattr(event.checkbox, "data", "")
+        if event.value:
+            self.selected_names.add(name)
+        else:
+            self.selected_names.discard(name)
+        self.app.apply_kuma_tag_filter(self.selected_names)
+
+    async def on_key(self, event: events.Key) -> None:
+        if event.key not in ("up", "down"):
+            return
+        await self._move_focus(-1 if event.key == "up" else 1)
+        event.stop()
+
+    async def _move_focus(self, delta: int) -> None:
+        if not self.list_container:
+            return
+        checkboxes = list(self.list_container.query("Checkbox"))
+        if not checkboxes:
+            return
+        current_index = next((i for i, cb in enumerate(checkboxes) if cb.has_focus), -1)
+        if current_index == -1:
+            target = 0 if delta > 0 else len(checkboxes) - 1
+        else:
+            target = max(0, min(len(checkboxes) - 1, current_index + delta))
+        checkboxes[target].focus()
+
+
 class KumaFixtureListDisplay(Vertical):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -175,6 +248,7 @@ class KumaFixtureListDisplay(Vertical):
         self.filter_text = ""
         self.list_container: VerticalScroll | None = None
         self.selected_ids: set[str] = set()
+        self.selected_tags: set[str] = set()
 
     def compose(self) -> ComposeResult:
         with Horizontal(id="kuma_filter_row"):
@@ -196,6 +270,11 @@ class KumaFixtureListDisplay(Vertical):
         self.items = items or []
         self.refresh_options()
 
+    def set_selected_tags(self, tags: set[str]):
+        """Filter fixtures by selected tag names."""
+        self.selected_tags = set(tags or [])
+        self.refresh_options()
+
     def refresh_options(self):
         if not self.list_container:
             return
@@ -209,6 +288,8 @@ class KumaFixtureListDisplay(Vertical):
             if not uuid:
                 continue
             tags = fixture.tags
+            if self.selected_tags and not self.selected_tags.issubset(set(tags or [])):
+                continue
             if filter_value and filter_value.lower() not in name.lower():
                 continue
             label = f"{name} {tags}" if tags else name
@@ -378,7 +459,7 @@ class MVRtoKuma(App):
                                 id="add_kuma_tag",
                                 classes="small_button tag_header_button",
                             )
-                        self.kuma_tag_display = ListDisplay()
+                        self.kuma_tag_display = KumaTagListDisplay()
                         yield self.kuma_tag_display
                         self.kuma_fixtures_display = KumaFixtureListDisplay()
                         yield self.kuma_fixtures_display
@@ -515,7 +596,7 @@ class MVRtoKuma(App):
                     self.update_mvr_tag_display()
                     self.mvr_fixtures_display.update_items(self.mvr_fixtures)
                     self.kuma_fixtures_display.update_items(self.kuma_fixtures)
-                    self.kuma_tag_display.update_items(self.kuma_tags)
+                    self.update_kuma_tag_display()
 
                     if not data.get("singleline_ui_toggle", False):
                         for button in self.query("Button"):
@@ -605,21 +686,21 @@ class MVRtoKuma(App):
         )
         self.mvr_tag_display.update_items(self.tags)
 
+    def apply_kuma_tag_filter(self, selected_tags: set[str] | None):
+        """Filter fixtures based on selected Kuma tags."""
+        self.selected_kuma_tags = set(selected_tags or [])
+        if hasattr(self, "kuma_fixtures_display"):
+            self.kuma_fixtures_display.set_selected_tags(self.selected_kuma_tags)
+
     def update_kuma_tag_display(self):
         """Refresh Kuma tags with current filter."""
         if not self.kuma_tags:
+            self.kuma_tag_display.set_filter_text(self.kuma_tag_filter)
             self.kuma_tag_display.update_items([])
+            self.apply_kuma_tag_filter(set())
             return
-        filter_value = (self.kuma_tag_filter or "").lower()
-        filtered = []
-        for tag in self.kuma_tags:
-            name = getattr(tag, "name", "") or ""
-            uuid = getattr(tag, "uuid", "") or ""
-            haystack = f"{name} {uuid}".lower()
-            if filter_value and filter_value not in haystack:
-                continue
-            filtered.append(tag)
-        self.kuma_tag_display.update_items(filtered)
+        self.kuma_tag_display.set_filter_text(self.kuma_tag_filter)
+        self.kuma_tag_display.update_items(self.kuma_tags)
         try:
             btn = self.query_one("#apply_kuma_tags", Button)
             btn.disabled = False
